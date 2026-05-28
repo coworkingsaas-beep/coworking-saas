@@ -12,7 +12,6 @@ import {
   BarChart3,
   Settings,
   HelpCircle,
-  Plus,
   Zap,
 } from "lucide-react";
 
@@ -21,7 +20,7 @@ const navItems = [
   { label: "Members", href: "/members", icon: Users },
   { label: "Payments", href: "/payments", icon: CreditCard },
   { label: "Workspaces", href: "/workspaces", icon: Building2 },
-  { label: "Bookings", href: "/bookings", icon: CalendarDays },
+  { label: "Meeting Room", href: "/bookings", icon: CalendarDays },
   { label: "Leads", href: "/leads", icon: TrendingUp },
   { label: "P&L Report", href: "/pnl", icon: BarChart3 },
 ];
@@ -146,38 +145,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Add Booking CTA */}
-      <div style={{ padding: "12px 12px 0" }}>
-        <button
-          style={{
-            width: "100%",
-            padding: "11px 16px",
-            background: "var(--primary)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "var(--radius-sm)",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            transition: "background 0.15s ease",
-          }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              "var(--primary-dark)")
-          }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              "var(--primary)")
-          }
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          Add Booking
-        </button>
-      </div>
 
       {/* Bottom nav */}
       <div style={{ padding: "12px 12px 16px", borderTop: "1px solid var(--border-light)", marginTop: 12 }}>

@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Users, AlertCircle, Building2, TrendingUp,
-  Search, Filter, UserPlus, ChevronLeft, ChevronRight, Plus, Zap, Pencil,
+  Search, Filter, UserPlus, ChevronLeft, ChevronRight, Plus, Zap, Pencil, Loader2, Check,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { Member } from "@/lib/supabase";
+import AddMemberModal from "@/components/members/AddMemberModal";
+import EditMemberModal from "@/components/members/EditMemberModal";
+import { useSpaces, getOccupiedSpaces } from "@/lib/useSpaces";
 
 // ── Mock data from roadmap fields ──────────────────────────────────────────
 const MEMBERS = [
@@ -110,15 +115,133 @@ function PayBadge({ status }: { status: string }) {
   );
 }
 
-function PrintBar({ used, allowed }: { used: number; allowed: number }) {
-  const pct = Math.min((used / allowed) * 100, 100);
+function PrintBar({ used, allowed, memberId, onUpdate }: { used: number; allowed: number; memberId: string; onUpdate: (id: string, used: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(String(used));
+  const [saving, setSaving]   = useState(false);
+  const pct   = Math.min((used / allowed) * 100, 100);
   const color = pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#6366F1";
+
+  const save = async () => {
+    const n = parseInt(val);
+    if (isNaN(n) || n === used) { setEditing(false); return; }
+    setSaving(true);
+    await supabase.from("members").update({ total_prints_used: n }).eq("id", memberId);
+    setSaving(false);
+    setEditing(false);
+    onUpdate(memberId, n);
+  };
+
   return (
-    <div style={{ width: 120 }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 4 }}>{used}/{allowed}</div>
+    <div style={{ width: 130 }}>
+      {editing ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+          <input
+            autoFocus
+            type="number" min={0} max={allowed}
+            value={val}
+            onChange={e => setVal(e.target.value)}
+            onBlur={save}
+            onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+            style={{ width: 56, padding: "2px 6px", border: "1px solid var(--primary)", borderRadius: 4, fontSize: 12.5, fontFamily: "inherit", outline: "none", background: "var(--neutral)", color: "var(--text-primary)" }}
+          />
+          <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>/{allowed}</span>
+          {saving && <Loader2 size={11} style={{ animation: "spin 1s linear infinite", color: "var(--primary)" }} />}
+        </div>
+      ) : (
+        <div
+          title="Click to edit print usage"
+          onClick={() => { setVal(String(used)); setEditing(true); }}
+          style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          {used}/{allowed}
+          <span style={{ fontSize: 10, color: "var(--primary)", opacity: 0.7 }}>✏</span>
+        </div>
+      )}
       <div style={{ height: 5, background: "var(--border)", borderRadius: 999, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 999, transition: "width 0.4s ease" }} />
       </div>
+    </div>
+  );
+}
+
+// ── Inline editable Space Type cell ────────────────────────────────────────
+const SPACE_TYPES = ["Dedicated Desk", "Manager Cabin", "Two-Seater Cabin", "Virtual Desk"];
+
+function InlineSpaceType({ value, memberId, onUpdate }: { value: string; memberId: string; onUpdate: (id: string, v: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+
+  const save = async (v: string) => {
+    if (v === value) return;
+    setSaving(true);
+    await supabase.from("members").update({ space_type: v }).eq("id", memberId);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 1200);
+    onUpdate(memberId, v);
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <select
+        value={value || ""}
+        onChange={e => save(e.target.value)}
+        style={{ padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", cursor: "pointer", outline: "none", maxWidth: 150 }}
+      >
+        <option value="">— None —</option>
+        {SPACE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
+      {saving && <Loader2 size={12} style={{ animation: "spin 1s linear infinite", color: "var(--primary)" }} />}
+      {saved  && <Check  size={12} color="#10B981" />}
+    </div>
+  );
+}
+
+// ── Inline editable Assigned Space cell ─────────────────────────────────────
+function InlineAssignedSpace({ value, memberId, spaceType, allSpaces, occupiedBy, onUpdate }: {
+  value: string; memberId: string; spaceType: string;
+  allSpaces: { code: string; label: string; type: string; is_active: boolean }[];
+  occupiedBy: Record<string, string>; // code → memberId
+  onUpdate: (id: string, space: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+
+  const save = async (v: string) => {
+    if (v === value) return;
+    setSaving(true);
+    await supabase.from("members").update({ assigned_space: v || null }).eq("id", memberId);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 1200);
+    onUpdate(memberId, v);
+  };
+
+  // Map space type to DB type
+  const dbType = spaceType?.includes("Cabin") ? "Cabin" : spaceType?.includes("Virtual") ? "Virtual Desk" : spaceType?.includes("Meeting") ? "Meeting Room" : "Desk";
+  const available = allSpaces.filter(s =>
+    s.is_active && (s.type === dbType || !spaceType) &&
+    (s.code === value || !occupiedBy[s.code] || occupiedBy[s.code] === memberId)
+  );
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <select
+        value={value || ""}
+        onChange={e => save(e.target.value)}
+        style={{ padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12.5, fontFamily: "inherit", background: "var(--neutral)", color: value ? "var(--primary)" : "var(--text-muted)", fontWeight: value ? 700 : 400, cursor: "pointer", outline: "none", maxWidth: 130 }}
+      >
+        <option value="">— None —</option>
+        {available.map(s => (
+          <option key={s.code} value={s.code}>
+            {s.code}{occupiedBy[s.code] && occupiedBy[s.code] !== memberId ? " (taken)" : ""}
+          </option>
+        ))}
+        {/* Always show current value even if not in list */}
+        {value && !available.find(s => s.code === value) && (
+          <option value={value}>{value}</option>
+        )}
+      </select>
+      {saving && <Loader2 size={12} style={{ animation: "spin 1s linear infinite", color: "var(--primary)" }} />}
+      {saved  && <Check  size={12} color="#10B981" />}
     </div>
   );
 }
@@ -143,18 +266,81 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function MembersPage() {
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [search, setSearch]             = useState("");
+  const [filterStatus, setFilterStatus]  = useState("All");
+  const [showModal, setShowModal]        = useState(false);
+  const [dbMembers, setDbMembers]        = useState<Member[]>([]);
+  const [loading, setLoading]            = useState(true);
+  const [occupiedBy, setOccupiedBy]      = useState<Record<string, string>>({});
+  const [editMember, setEditMember]      = useState<Member | null>(null);
 
-  const filtered = MEMBERS.filter(m => {
+  const { spaces } = useSpaces();
+
+  // Build occupiedBy map: space_code → member_id
+  useEffect(() => {
+    supabase.from("members")
+      .select("id, assigned_space")
+      .eq("status", "Active")
+      .not("assigned_space", "is", null)
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, string> = {};
+        data.forEach((r: any) => { if (r.assigned_space) map[r.assigned_space] = r.id; });
+        setOccupiedBy(map);
+      });
+  }, [dbMembers]);
+
+  const fetchMembers = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("members")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data && data.length > 0) setDbMembers(data as Member[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+
+  const source = dbMembers.map(m => ({
+    id: m.id, name: m.name, company: m.company ?? "",
+    initials: m.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
+    phone: m.phone, email: m.email ?? "", dob: m.date_of_birth ?? "—",
+    joiningDate: m.joining_date, renewalDate: m.renewal_date ?? "—",
+    spaceType: m.space_type ?? "—", assignedSpace: m.assigned_space ?? "—",
+    securityDeposit: `₹${m.security_deposit.toLocaleString()}`,
+    rentAmount: `₹${m.rent_amount.toLocaleString()}`,
+    paymentStatus: "N/A", teamSize: `${m.team_size}`,
+    printsUsed: m.total_prints_used, printsAllowed: m.total_prints_allowed,
+    status: m.status, discounted: m.discounted_member,
+    source: m.source ?? "—", welcomeStatus: m.welcome_message_status,
+    color: ["#6366F1","#F59E0B","#EF4444","#10B981","#8B5CF6","#06B6D4"][Math.abs(m.name.charCodeAt(0)) % 6],
+  }));
+
+  const filtered = source.filter(m => {
     const q = search.toLowerCase();
-    const matchQ = m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.assignedSpace.toLowerCase().includes(q);
+    const matchQ = m.name.toLowerCase().includes(q) ||
+                   m.email.toLowerCase().includes(q) ||
+                   m.assignedSpace.toLowerCase().includes(q);
     const matchS = filterStatus === "All" || m.status === filterStatus;
     return matchQ && matchS;
   });
 
+  const activeCount   = source.filter(m => m.status === "Active").length;
+  const inactiveCount = source.filter(m => m.status === "Inactive").length;
+
+  if (loading) return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 16 }}>
+      <Loader2 size={40} color="var(--primary)" style={{ animation: "spin 1s linear infinite" }} />
+      <p style={{ fontSize: 14, color: "var(--text-muted)" }}>Loading members…</p>
+    </div>
+  );
+
   return (
     <div>
+      {showModal && <AddMemberModal onClose={() => setShowModal(false)} onSaved={fetchMembers} />}
+      {editMember && <EditMemberModal member={editMember} onClose={() => setEditMember(null)} onSaved={fetchMembers} />}
+
       {/* Page Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 14 }}>
         <div>
@@ -165,10 +351,10 @@ export default function MembersPage() {
 
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
-        <KpiCard icon={Users} iconColor="#6366F1" iconBg="#EDE9FE" label="Total Active Members" value="1,248" badge="+12%" badgeColor="#6366F1" />
-        <KpiCard icon={AlertCircle} iconColor="#EF4444" iconBg="#FEE2E2" label="Payment Due" value={<>42 <span style={{ fontSize: 14, fontWeight: 400, color: "var(--text-muted)" }}>members</span></>} badge="Urgent" badgeColor="#EF4444" />
-        <KpiCard icon={Building2} iconColor="#4F5D70" iconBg="#E2E8F0" label="Available Spaces" value={<>15 <span style={{ fontSize: 14, fontWeight: 400, color: "var(--text-muted)" }}>units</span></>} />
-        <KpiCard icon={TrendingUp} iconColor="#6366F1" iconBg="#EDE9FE" label="Monthly Revenue" value="₹45.2k" badge="Target: 92%" badgeColor="#6366F1" />
+        <KpiCard icon={Users} iconColor="#6366F1" iconBg="#EDE9FE" label="Total Active Members" value={activeCount} />
+        <KpiCard icon={AlertCircle} iconColor="#EF4444" iconBg="#FEE2E2" label="Inactive Members" value={inactiveCount} />
+        <KpiCard icon={Building2} iconColor="#4F5D70" iconBg="#E2E8F0" label="Total Members" value={source.length} />
+        <KpiCard icon={TrendingUp} iconColor="#6366F1" iconBg="#EDE9FE" label="Showing" value={filtered.length} />
       </div>
 
       {/* Table Card */}
@@ -198,7 +384,7 @@ export default function MembersPage() {
               <Filter size={13} /> Filters
             </button>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={() => setShowModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             <UserPlus size={15} /> Add Member
           </button>
         </div>
@@ -280,38 +466,72 @@ export default function MembersPage() {
                   <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.dob}</td>
                   <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.joiningDate}</td>
                   <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.renewalDate}</td>
-                  <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.spaceType}</td>
-                  <td style={{ padding: "14px 18px", fontSize: 13.5, fontWeight: 700, color: "var(--primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.assignedSpace}</td>
+                  <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
+                    <InlineSpaceType
+                      value={m.spaceType === "—" ? "" : m.spaceType}
+                      memberId={m.id}
+                      onUpdate={(id, v) => setDbMembers(prev => prev.map(x => x.id === id ? { ...x, space_type: v } as Member : x))}
+                    />
+                  </td>
+                  <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
+                    <InlineAssignedSpace
+                      value={m.assignedSpace === "—" ? "" : m.assignedSpace}
+                      memberId={m.id}
+                      spaceType={m.spaceType === "—" ? "" : m.spaceType}
+                      allSpaces={spaces}
+                      occupiedBy={occupiedBy}
+                      onUpdate={(id, v) => {
+                        setDbMembers(prev => prev.map(x => x.id === id ? { ...x, assigned_space: v } : x));
+                        setOccupiedBy(prev => {
+                          const next = { ...prev };
+                          // Remove old assignment
+                          Object.keys(next).forEach(k => { if (next[k] === id) delete next[k]; });
+                          if (v) next[v] = id;
+                          return next;
+                        });
+                      }}
+                    />
+                  </td>
                   <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.securityDeposit}</td>
                   <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}><PayBadge status={m.paymentStatus} /></td>
                   <td style={{ padding: "14px 18px", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>{m.teamSize}</td>
-                  <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}><PrintBar used={m.printsUsed} allowed={m.printsAllowed} /></td>
+                  <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
+                    <PrintBar
+                      used={m.printsUsed}
+                      allowed={m.printsAllowed}
+                      memberId={m.id}
+                      onUpdate={(id, newUsed) =>
+                        setDbMembers(prev => prev.map(x => x.id === id ? { ...x, total_prints_used: newUsed } : x))
+                      }
+                    />
+                  </td>
                   <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}><StatusDot status={m.status} /></td>
                   {/* Edit button */}
                   <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
-                    <button
-                      style={{
-                        display: "flex", alignItems: "center", gap: 5,
-                        padding: "6px 12px",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-sm)",
-                        background: "var(--neutral)",
-                        color: "var(--text-secondary)",
-                        fontSize: 12.5, fontWeight: 600,
-                        cursor: "pointer", fontFamily: "inherit",
-                        transition: "all 0.15s",
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = "rgba(99,102,241,0.09)";
-                        (e.currentTarget as HTMLElement).style.color = "var(--primary)";
-                        (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = "var(--neutral)";
-                        (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
-                        (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
-                      }}
-                    >
+                      <button
+                        onClick={() => setEditMember(dbMembers.find(x => x.id === m.id) ?? null)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          padding: "6px 12px",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          background: "var(--neutral)",
+                          color: "var(--text-secondary)",
+                          fontSize: 12.5, fontWeight: 600,
+                          cursor: "pointer", fontFamily: "inherit",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = "rgba(99,102,241,0.09)";
+                          (e.currentTarget as HTMLElement).style.color = "var(--primary)";
+                          (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = "var(--neutral)";
+                          (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+                          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                        }}
+                      >
                       <Pencil size={13} strokeWidth={2} />
                       Edit
                     </button>
@@ -395,10 +615,11 @@ export default function MembersPage() {
 
       {/* FAB */}
       <button
+        onClick={() => setShowModal(true)}
         style={{ position: "fixed", bottom: 32, right: 32, width: 52, height: 52, borderRadius: "50%", background: "var(--primary)", color: "#fff", border: "none", boxShadow: "var(--shadow-md)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, transition: "transform 0.2s" }}
         onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.1)"}
         onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "scale(1)"}
-        title="Quick Member Add"
+        title="Add Member"
       >
         <Plus size={22} strokeWidth={2.5} />
       </button>

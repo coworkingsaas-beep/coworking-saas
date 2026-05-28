@@ -1,8 +1,28 @@
 "use client";
-
-import { Bell, MessageSquare, HelpCircle, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, MessageSquare, HelpCircle, Search, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function Header() {
+  const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName,  setUserName]  = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserEmail(user.email ?? null);
+        setUserName(user.user_metadata?.name ?? user.email?.split("@")[0] ?? "Admin");
+      }
+    });
+  }, []);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    router.push("/admin/login");
+    router.refresh();
+  };
   return (
     <header
       style={{
@@ -105,33 +125,25 @@ export default function Header() {
       {/* Divider */}
       <div style={{ width: 1, height: 28, background: "var(--border)" }} />
 
-      {/* User */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+      {/* User + Logout */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3, textAlign: "right" }}>
-            Admin User
+            {userName ?? "Admin"}
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-muted)", textAlign: "right" }}>
-            Space Manager
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {userEmail ?? "Space Manager"}
           </div>
         </div>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 14,
-            fontWeight: 700,
-            color: "#fff",
-            flexShrink: 0,
-          }}
-        >
-          A
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+          {(userName ?? "A")[0].toUpperCase()}
         </div>
+        <button onClick={logout} title="Log out"
+          style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", cursor: "pointer", transition: "all 0.15s" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FEE2E2"; (e.currentTarget as HTMLElement).style.borderColor = "#EF4444"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}>
+          <LogOut size={15} color="#EF4444"/>
+        </button>
       </div>
     </header>
   );
