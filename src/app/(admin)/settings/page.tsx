@@ -4,6 +4,7 @@ import { Building2, CreditCard, Bell, Shield, Palette, Save, ChevronRight, Plus,
 import { supabase } from "@/lib/supabase";
 import type { Space } from "@/lib/useSpaces";
 import { useSettings, CURRENCIES, type AppSettings } from "@/lib/useSettings";
+import { useAppearance } from "@/lib/useAppearance";
 
 const TABS = [
   { id: "profile",       label: "Space Profile",    icon: Building2 },
@@ -54,18 +55,25 @@ function Input({ defaultValue, placeholder, value, onChange }: any) {
   );
 }
 
-function Toggle({ defaultChecked }: { defaultChecked?: boolean }) {
-  const [on, setOn] = useState(defaultChecked ?? false);
+function Toggle({ defaultChecked, checked, onChange }: { defaultChecked?: boolean; checked?: boolean; onChange?: (v: boolean) => void }) {
+  const [localOn, setLocalOn] = useState(defaultChecked ?? false);
+  const on = checked !== undefined ? checked : localOn;
+  const handleToggle = () => {
+    if (onChange) onChange(!on);
+    if (checked === undefined) {
+      setLocalOn(!on);
+    }
+  };
   return (
-    <button onClick={() => setOn(!on)} style={{ width: 44, height: 24, borderRadius: 999, background: on ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+    <button onClick={handleToggle} style={{ width: 44, height: 24, borderRadius: 999, background: on ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
       <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
     </button>
   );
 }
 
-function Select({ options, defaultValue }: { options: string[]; defaultValue?: string }) {
+function Select({ options, defaultValue, value, onChange }: { options: string[]; defaultValue?: string; value?: string; onChange?: (v: string) => void }) {
   return (
-    <select defaultValue={defaultValue} style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", outline: "none", cursor: "pointer" }}>
+    <select value={value !== undefined ? value : undefined} defaultValue={value === undefined ? defaultValue : undefined} onChange={e => onChange?.(e.target.value)} style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", outline: "none", cursor: "pointer" }}>
       {options.map(o => <option key={o}>{o}</option>)}
     </select>
   );
@@ -423,33 +431,45 @@ const THEMES  = [{ id:"system",label:"System",desc:"Follows OS preference" },{ i
 const ACCENTS = ["#6366F1","#3B82F6","#10B981","#F59E0B","#EF4444","#8B5CF6","#06B6D4"];
 
 function AppearanceTab() {
-  const [theme, setTheme]   = useState("system");
-  const [accent, setAccent] = useState("#6366F1");
+  const { appearance, setAppearance } = useAppearance();
+
   return (
     <>
       <Section title="Theme" sub="Choose your preferred color mode">
         <div style={{ display: "flex", gap: 12, padding: "20px" }}>
-          {THEMES.map(t => (
-            <button key={t.id} onClick={() => setTheme(t.id)} style={{ flex: 1, padding: "16px", border: `2px solid ${theme===t.id?"var(--primary)":"var(--border)"}`, borderRadius: "var(--radius-sm)", background: theme===t.id?"rgba(99,102,241,0.06)":"var(--neutral)", cursor: "pointer", textAlign: "center", fontFamily: "inherit" }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>{t.id==="system"?"⚙️":t.id==="light"?"☀️":"🌙"}</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: theme===t.id?"var(--primary)":"var(--text-primary)" }}>{t.label}</div>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{t.desc}</div>
-            </button>
-          ))}
+          {THEMES.map(t => {
+            const isSelected = appearance.theme === t.id;
+            return (
+              <button key={t.id} onClick={() => setAppearance({ theme: t.id as any })} style={{ flex: 1, padding: "16px", border: `2px solid ${isSelected?"var(--primary)":"var(--border)"}`, borderRadius: "var(--radius-sm)", background: isSelected?"rgba(99,102,241,0.06)":"var(--neutral)", cursor: "pointer", textAlign: "center", fontFamily: "inherit" }}>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>{t.id==="system"?"⚙️":t.id==="light"?"☀️":"🌙"}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: isSelected?"var(--primary)":"var(--text-primary)" }}>{t.label}</div>
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{t.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </Section>
       <Section title="Accent Color" sub="Primary color used across the UI">
         <div style={{ padding: "20px", display: "flex", gap: 10, alignItems: "center" }}>
-          {ACCENTS.map(c => (
-            <button key={c} onClick={() => setAccent(c)} style={{ width: 36, height: 36, borderRadius: "50%", background: c, border: `3px solid ${accent===c?"var(--text-primary)":"transparent"}`, cursor: "pointer", outline: "none" }} />
-          ))}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>Current: <strong style={{ color: accent }}>{accent}</strong></span>
+          {ACCENTS.map(c => {
+            const isSelected = appearance.accent === c;
+            return (
+              <button key={c} onClick={() => setAppearance({ accent: c })} style={{ width: 36, height: 36, borderRadius: "50%", background: c, border: `3px solid ${isSelected?"var(--text-primary)":"transparent"}`, cursor: "pointer", outline: "none" }} />
+            );
+          })}
+          <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>Current: <strong style={{ color: appearance.accent }}>{appearance.accent}</strong></span>
         </div>
       </Section>
       <Section title="Display">
-        <Field label="Compact Table Rows" sub="Reduce row height for more data density"><Toggle defaultChecked={false} /></Field>
-        <Field label="Show Serial Numbers" sub="# column in all tables"><Toggle defaultChecked={true} /></Field>
-        <Field label="Date Format"><Select options={["DD MMM YYYY","DD/MM/YYYY","MM/DD/YYYY","YYYY-MM-DD"]} defaultValue="DD MMM YYYY" /></Field>
+        <Field label="Compact Table Rows" sub="Reduce row height for more data density">
+          <Toggle checked={appearance.compactRows} onChange={v => setAppearance({ compactRows: v })} />
+        </Field>
+        <Field label="Show Serial Numbers" sub="# column in all tables">
+          <Toggle checked={appearance.showSerialNumbers} onChange={v => setAppearance({ showSerialNumbers: v })} />
+        </Field>
+        <Field label="Date Format">
+          <Select options={["DD MMM YYYY","DD/MM/YYYY","MM/DD/YYYY","YYYY-MM-DD"]} value={appearance.dateFormat} onChange={v => setAppearance({ dateFormat: v })} />
+        </Field>
       </Section>
     </>
   );

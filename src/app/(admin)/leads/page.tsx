@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   UserPlus, CheckCircle2, XCircle, Clock, Search, Plus,
   Phone, Camera, Globe, Users, Star, Flame, Snowflake,
-  Loader2, ChevronRight, UserCheck, AlertCircle,
+  Loader2, ChevronRight, UserCheck, AlertCircle, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -184,6 +184,20 @@ export default function LeadsPage() {
   const [convertTarget,setConvertTarget]= useState<SignupLead | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tab, setTab] = useState<"signup" | "manual">("signup");
+  const [deleteTarget, setDeleteTarget]   = useState<SignupLead | null>(null);
+  const [deleting, setDeleting]           = useState(false);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    const { error } = await supabase.from("signup_leads").delete().eq("id", id);
+    if (!error) {
+      setSignupLeads(prev => prev.filter(x => x.id !== id));
+      setDeleteTarget(null);
+    } else {
+      alert("Failed to delete lead: " + error.message);
+    }
+    setDeleting(false);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,6 +226,29 @@ export default function LeadsPage() {
     <div>
       {rejectTarget  && <RejectModal  lead={rejectTarget}  onClose={() => setRejectTarget(null)}  onDone={load}/>}
       {convertTarget && <ConvertModal lead={convertTarget} onClose={() => setConvertTarget(null)} onDone={load}/>}
+      {deleteTarget && (
+        <>
+          <div onClick={() => setDeleteTarget(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 1000, width: "min(400px,95vw)", background: "var(--surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)", boxShadow: "0 20px 48px rgba(0,0,0,0.18)", padding: 24 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text-primary)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={20} color="#EF4444" />
+              Delete Lead Request
+            </div>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 20 }}>
+              Are you sure you want to permanently delete the sign-up request for <strong>{deleteTarget.name}</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting} style={{ padding: "8px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button onClick={() => handleDelete(deleteTarget.id)} disabled={deleting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#EF4444", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {deleting ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : null}
+                {deleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26, flexWrap: "wrap", gap: 14 }}>
@@ -304,31 +341,41 @@ export default function LeadsPage() {
                       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{new Date(l.signed_up_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>
                     </td>
                     <td style={tdS}><VerifBadge status={l.verification_status}/></td>
-                    <td style={{ ...tdS, minWidth: 200 }}>
-                      {l.verification_status === "Pending" && (
-                        <div style={{ display: "flex", gap: 6 }}>
+                    <td style={{ ...tdS, minWidth: 220 }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {l.verification_status === "Pending" && (
+                          <>
+                            <button onClick={() => setConvertTarget(l)}
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#059669", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                              <UserCheck size={11}/> Approve
+                            </button>
+                            <button onClick={() => setRejectTarget(l)}
+                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#FEE2E2", color: "#EF4444", border: "1px solid #FCA5A5", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                              <XCircle size={11}/> Reject
+                            </button>
+                          </>
+                        )}
+                        {l.verification_status === "Approved" && !l.converted_member_id && (
                           <button onClick={() => setConvertTarget(l)}
-                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#059669", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                            <UserCheck size={11}/> Approve
+                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#EDE9FE", color: "#6366F1", border: "1px solid #C4B5FD", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                            <ChevronRight size={11}/> Convert to Member
                           </button>
-                          <button onClick={() => setRejectTarget(l)}
-                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#FEE2E2", color: "#EF4444", border: "1px solid #FCA5A5", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                            <XCircle size={11}/> Reject
-                          </button>
-                        </div>
-                      )}
-                      {l.verification_status === "Approved" && !l.converted_member_id && (
-                        <button onClick={() => setConvertTarget(l)}
-                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "#EDE9FE", color: "#6366F1", border: "1px solid #C4B5FD", borderRadius: "var(--radius-sm)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                          <ChevronRight size={11}/> Convert to Member
+                        )}
+                        {l.verification_status === "Approved" && l.converted_member_id && (
+                          <span style={{ fontSize: 12, color: "#059669", fontWeight: 700 }}>✓ Member created</span>
+                        )}
+                        {l.verification_status === "Rejected" && (
+                          <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>{l.rejection_reason ? `"${l.rejection_reason.slice(0, 40)}…"` : "Rejected"}</span>
+                        )}
+                        <div style={{ flex: 1 }} />
+                        <button onClick={() => setDeleteTarget(l)}
+                          title="Delete Lead"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", cursor: "pointer", transition: "all 0.15s" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FEE2E2"; (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}>
+                          <Trash2 size={13} color="#EF4444" />
                         </button>
-                      )}
-                      {l.verification_status === "Approved" && l.converted_member_id && (
-                        <span style={{ fontSize: 12, color: "#059669", fontWeight: 700 }}>✓ Member created</span>
-                      )}
-                      {l.verification_status === "Rejected" && (
-                        <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>{l.rejection_reason ? `"${l.rejection_reason.slice(0, 40)}…"` : "Rejected"}</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

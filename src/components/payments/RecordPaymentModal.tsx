@@ -4,7 +4,7 @@ import { X, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSettings } from "@/lib/useSettings";
 
-interface Member { id: string; name: string; rent_amount: number; assigned_space: string | null; }
+interface Member { id: string; name: string; rent_amount: number; assigned_space: string | null; renewal_date: string | null; }
 interface Props { onClose: () => void; onSaved: () => void; prefillMemberId?: string; }
 
 const MODES = ["Cash", "UPI", "Bank"];
@@ -30,7 +30,7 @@ export default function RecordPaymentModal({ onClose, onSaved, prefillMemberId }
   const [form, setForm] = useState({ member_id: prefillMemberId ?? "", amount: "", mode: "UPI", payment_date: today, month: new Date().toLocaleString("default", { month: "short" }), year: String(new Date().getFullYear()), notes: "" });
 
   useEffect(() => {
-    supabase.from("members").select("id,name,rent_amount,assigned_space").eq("status","Active").order("name")
+    supabase.from("members").select("id,name,rent_amount,assigned_space,renewal_date").eq("status","Active").order("name")
       .then(({ data }) => { if (data) setMembers(data as Member[]); });
   }, []);
 
@@ -46,13 +46,29 @@ export default function RecordPaymentModal({ onClose, onSaved, prefillMemberId }
     if (!form.member_id) return setError("Select a member.");
     if (!form.amount) return setError("Enter amount.");
     setSaving(true);
+
+    const m = members.find(x => x.id === form.member_id);
+    const currentRenewal = m?.renewal_date;
+    const baseDate = currentRenewal ? new Date(currentRenewal) : new Date(form.payment_date);
+    baseDate.setMonth(baseDate.getMonth() + 1);
+    const nextRenewalDate = baseDate.toISOString().split("T")[0];
+
     const { error: err } = await supabase.from("payments").insert({
       member_id: form.member_id, amount: parseFloat(form.amount), mode: form.mode,
       payment_date: form.payment_date, month: form.month, year: parseInt(form.year),
       notes: form.notes || null, status: "Paid",
     });
+
+    if (err) {
+      setSaving(false);
+      setError(err.message);
+      return;
+    }
+
+    // Update the member's renewal date
+    await supabase.from("members").update({ renewal_date: nextRenewalDate }).eq("id", form.member_id);
+
     setSaving(false);
-    if (err) { setError(err.message); return; }
     onSaved(); onClose();
   };
 

@@ -40,10 +40,17 @@ export default function AddMemberModal({ onClose, onSaved }: Props) {
   // Derive unique space types available in the spaces table
   const spaceTypes = [...new Set(spaces.map(s => s.type))]; // "Desk" | "Cabin" | "Meeting Room"
 
+  const defaultJoining = new Date().toISOString().split("T")[0];
+  const defaultRenewal = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split("T")[0];
+  })();
+
   const [form, setForm] = useState({
     name: "", phone: "", email: "", company: "",
-    date_of_birth: "", joining_date: new Date().toISOString().split("T")[0],
-    renewal_date: "", space_type: "", assigned_space: "",
+    date_of_birth: "", joining_date: defaultJoining,
+    renewal_date: defaultRenewal, space_type: "", assigned_space: "",
     security_deposit: "", rent_amount: "", team_size: "1",
     source: "Direct", discounted_member: false,
     total_prints_allowed: "500", notes: "",
@@ -64,6 +71,20 @@ export default function AddMemberModal({ onClose, onSaved }: Props) {
   );
 
   const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleJoiningDateChange = (dateVal: string) => {
+    const d = new Date(dateVal);
+    d.setMonth(d.getMonth() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const renewalVal = `${year}-${month}-${day}`;
+    setForm(f => ({
+      ...f,
+      joining_date: dateVal,
+      renewal_date: renewalVal
+    }));
+  };
 
   // When space_type changes, reset assigned_space
   const setSpaceType = (t: string) => setForm(f => ({ ...f, space_type: t, assigned_space: "" }));
@@ -153,7 +174,7 @@ export default function AddMemberModal({ onClose, onSaved }: Props) {
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 14 }}>Space Assignment</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
               <Field label="Joining Date" required>
-                <input value={form.joining_date} onChange={e => set("joining_date", e.target.value)} type="date" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
+                <input value={form.joining_date} onChange={e => handleJoiningDateChange(e.target.value)} type="date" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
               </Field>
               <Field label="Renewal Date">
                 <input value={form.renewal_date} onChange={e => set("renewal_date", e.target.value)} type="date" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />

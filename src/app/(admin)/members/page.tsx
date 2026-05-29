@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Users, AlertCircle, Building2, TrendingUp,
-  Search, Filter, UserPlus, ChevronLeft, ChevronRight, Plus, Zap, Pencil, Loader2, Check,
+  Search, Filter, UserPlus, ChevronLeft, ChevronRight, Plus, Zap, Pencil, Loader2, Check, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member } from "@/lib/supabase";
@@ -274,6 +274,20 @@ export default function MembersPage() {
   const [loading, setLoading]            = useState(true);
   const [occupiedBy, setOccupiedBy]      = useState<Record<string, string>>({});
   const [editMember, setEditMember]      = useState<Member | null>(null);
+  const [deleteTarget, setDeleteTarget]  = useState<Member | null>(null);
+  const [deleting, setDeleting]          = useState(false);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    const { error } = await supabase.from("members").delete().eq("id", id);
+    if (!error) {
+      setDbMembers(prev => prev.filter(x => x.id !== id));
+      setDeleteTarget(null);
+    } else {
+      alert("Failed to delete member: " + error.message);
+    }
+    setDeleting(false);
+  };
 
   const { spaces } = useSpaces();
   const { fmt } = useSettings();
@@ -342,6 +356,29 @@ export default function MembersPage() {
     <div>
       {showModal && <AddMemberModal onClose={() => setShowModal(false)} onSaved={fetchMembers} />}
       {editMember && <EditMemberModal member={editMember} onClose={() => setEditMember(null)} onSaved={fetchMembers} />}
+      {deleteTarget && (
+        <>
+          <div onClick={() => setDeleteTarget(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 1000, width: "min(400px,95vw)", background: "var(--surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)", boxShadow: "0 20px 48px rgba(0,0,0,0.18)", padding: 24 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--text-primary)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={20} color="#EF4444" />
+              Delete Member
+            </div>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 20 }}>
+              Are you sure you want to permanently delete <strong>{deleteTarget.name}</strong>? This action will remove their record from the database and cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting} style={{ padding: "8px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button onClick={() => handleDelete(deleteTarget.id)} disabled={deleting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#EF4444", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {deleting ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : null}
+                {deleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Page Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 14 }}>
@@ -508,8 +545,9 @@ export default function MembersPage() {
                     />
                   </td>
                   <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}><StatusDot status={m.status} /></td>
-                  {/* Edit button */}
+                   {/* Edit & Delete buttons */}
                   <td style={{ padding: "14px 18px", whiteSpace: "nowrap", background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
                       <button
                         onClick={() => setEditMember(dbMembers.find(x => x.id === m.id) ?? null)}
                         style={{
@@ -534,9 +572,35 @@ export default function MembersPage() {
                           (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
                         }}
                       >
-                      <Pencil size={13} strokeWidth={2} />
-                      Edit
-                    </button>
+                        <Pencil size={13} strokeWidth={2} />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(dbMembers.find(x => x.id === m.id) ?? null)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          padding: "6px 12px",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          background: "var(--neutral)",
+                          color: "#EF4444",
+                          fontSize: 12.5, fontWeight: 600,
+                          cursor: "pointer", fontFamily: "inherit",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = "#FEE2E2";
+                          (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5";
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = "var(--neutral)";
+                          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                        }}
+                      >
+                        <Trash2 size={13} strokeWidth={2} />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

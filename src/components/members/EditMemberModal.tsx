@@ -66,6 +66,20 @@ export default function EditMemberModal({ member, onClose, onSaved }: Props) {
 
   const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleJoiningDateChange = (dateVal: string) => {
+    const d = new Date(dateVal);
+    d.setMonth(d.getMonth() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const renewalVal = `${year}-${month}-${day}`;
+    setForm(f => ({
+      ...f,
+      joining_date: dateVal,
+      renewal_date: renewalVal
+    }));
+  };
+
   const setSpaceType = (t: string) => setForm(f => ({ ...f, space_type: t, assigned_space: "" }));
 
   const availableSpaces = spaces.filter(s =>
@@ -146,7 +160,7 @@ export default function EditMemberModal({ member, onClose, onSaved }: Props) {
 
             <SectionLabel label="Space Assignment"/>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
-              <Field label="Joining Date"><input value={form.joining_date} onChange={e=>set("joining_date",e.target.value)} type="date" style={inp} onFocus={focus} onBlur={blur}/></Field>
+              <Field label="Joining Date"><input value={form.joining_date} onChange={e=>handleJoiningDateChange(e.target.value)} type="date" style={inp} onFocus={focus} onBlur={blur}/></Field>
               <Field label="Renewal Date"><input value={form.renewal_date} onChange={e=>set("renewal_date",e.target.value)} type="date" style={inp} onFocus={focus} onBlur={blur}/></Field>
               <Field label="Space Type">
                 {spacesLoading
