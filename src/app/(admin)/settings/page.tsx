@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Building2, CreditCard, Bell, Shield, Palette, Save, ChevronRight, Plus, Trash2, Loader2, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Space } from "@/lib/useSpaces";
+import { useSettings, CURRENCIES, type AppSettings } from "@/lib/useSettings";
 
 const TABS = [
   { id: "profile",       label: "Space Profile",    icon: Building2 },
@@ -228,29 +229,135 @@ function ProfileTab() {
 }
 
 function PaymentsTab() {
+  const { settings, saveSettings, loading } = useSettings();
+  const [form, setForm] = useState<AppSettings>(settings);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Sync form when settings load from DB
+  useEffect(() => { setForm(settings); }, [settings]);
+
+  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    await saveSettings(form);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const DUE_DAYS = ["1st", "5th", "7th", "10th", "15th", "20th", "25th", "Last day"];
+  const dayVal = `${form.monthly_due_day}${form.monthly_due_day === 1 ? "st" : form.monthly_due_day === 5 ? "th" : "th"}`;
+
+  if (loading) return (
+    <div style={{ padding: 40, display: "flex", alignItems: "center", gap: 10, color: "var(--text-muted)" }}>
+      <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> Loading settings…
+    </div>
+  );
+
   return (
     <>
       <Section title="Billing Defaults" sub="Applied when creating new payment records">
-        <Field label="Currency" sub="All amounts displayed in this currency"><Select options={["INR — ₹","USD — $","EUR — €"]} defaultValue="INR — ₹" /></Field>
-        <Field label="Monthly Due Date" sub="Day of month payments are due"><Select options={["1st","5th","7th","10th","15th"]} defaultValue="5th" /></Field>
-        <Field label="Default Seat Rent (₹)" sub="Pre-filled for new members"><Input defaultValue="4500" /></Field>
-        <Field label="Default Cabin Rent (₹)"><Input defaultValue="14000" /></Field>
-        <Field label="Security Deposit Multiplier" sub="e.g. 2 = 2× monthly rent"><Input defaultValue="2" /></Field>
+        <Field label="Currency" sub="All monetary values across the platform use this">
+          <select
+            value={form.currency}
+            onChange={(e) => set("currency", e.target.value)}
+            style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", outline: "none", cursor: "pointer" }}
+          >
+            {Object.entries(CURRENCIES).map(([code, meta]) => (
+              <option key={code} value={code}>{meta.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Monthly Due Date" sub="Day of month payments are due">
+          <select
+            value={dayVal}
+            onChange={(e) => {
+              const n = parseInt(e.target.value);
+              set("monthly_due_day", n);
+            }}
+            style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", outline: "none", cursor: "pointer" }}
+          >
+            {DUE_DAYS.map((d) => <option key={d}>{d}</option>)}
+          </select>
+        </Field>
+        <Field label={`Default Seat Rent (${CURRENCIES[form.currency]?.symbol ?? "₹"})`} sub="Pre-filled for new members">
+          <input value={form.default_seat_rent} onChange={(e) => set("default_seat_rent", parseInt(e.target.value) || 0)} type="number" style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
+        <Field label={`Default Cabin Rent (${CURRENCIES[form.currency]?.symbol ?? "₹"})`}>
+          <input value={form.default_cabin_rent} onChange={(e) => set("default_cabin_rent", parseInt(e.target.value) || 0)} type="number" style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
+        <Field label="Security Deposit Multiplier" sub="e.g. 2 = 2× monthly rent">
+          <input value={form.deposit_multiplier} onChange={(e) => set("deposit_multiplier", parseFloat(e.target.value) || 0)} type="number" min={0} step={0.5} style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
       </Section>
+
       <Section title="Overdue Rules">
-        <Field label="Grace Period (days)" sub="Days after due date before marking overdue"><Input defaultValue="3" /></Field>
-        <Field label="Auto-flag Overdue" sub="Automatically mark as overdue after grace period"><Toggle defaultChecked={true} /></Field>
-        <Field label="Late Fee (₹)" sub="Optional flat fee added after grace period"><Input defaultValue="0" /></Field>
+        <Field label="Grace Period (days)" sub="Days after due date before marking overdue">
+          <input value={form.grace_period_days} onChange={(e) => set("grace_period_days", parseInt(e.target.value) || 0)} type="number" min={0} style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
+        <Field label="Auto-flag Overdue" sub="Automatically mark as overdue after grace period">
+          <button onClick={() => set("auto_flag_overdue", !form.auto_flag_overdue)}
+            style={{ width: 44, height: 24, borderRadius: 999, background: form.auto_flag_overdue ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: form.auto_flag_overdue ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </Field>
+        <Field label={`Late Fee (${CURRENCIES[form.currency]?.symbol ?? "₹"})`} sub="Optional flat fee added after grace period">
+          <input value={form.late_fee} onChange={(e) => set("late_fee", parseInt(e.target.value) || 0)} type="number" min={0} style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
       </Section>
+
       <Section title="Payment Modes">
-        <Field label="Accept Cash"><Toggle defaultChecked={true} /></Field>
-        <Field label="Accept UPI"><Toggle defaultChecked={true} /></Field>
-        <Field label="Accept Bank Transfer"><Toggle defaultChecked={true} /></Field>
-        <Field label="UPI ID" sub="For QR code on receipts"><Input defaultValue="cospace@okaxis" /></Field>
+        <Field label="Accept Cash">
+          <button onClick={() => set("accept_cash", !form.accept_cash)}
+            style={{ width: 44, height: 24, borderRadius: 999, background: form.accept_cash ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: form.accept_cash ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </Field>
+        <Field label="Accept UPI">
+          <button onClick={() => set("accept_upi", !form.accept_upi)}
+            style={{ width: 44, height: 24, borderRadius: 999, background: form.accept_upi ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: form.accept_upi ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </Field>
+        <Field label="Accept Bank Transfer">
+          <button onClick={() => set("accept_bank_transfer", !form.accept_bank_transfer)}
+            style={{ width: 44, height: 24, borderRadius: 999, background: form.accept_bank_transfer ? "var(--primary)" : "var(--border)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: form.accept_bank_transfer ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </Field>
+        <Field label="UPI ID" sub="For QR code on receipts">
+          <input value={form.upi_id} onChange={(e) => set("upi_id", e.target.value)} placeholder="cospace@okaxis" style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")} />
+        </Field>
       </Section>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8 }}>
+        <button onClick={() => setForm(settings)} style={{ padding: "9px 20px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--text-secondary)", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Reset
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 22px", background: saved ? "#10B981" : "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "background 0.3s" }}>
+          {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : saved ? <Check size={14} /> : <Save size={14} />}
+          {saving ? "Saving…" : saved ? "Saved!" : "Save Changes"}
+        </button>
+      </div>
     </>
   );
 }
+
 
 function NotificationsTab() {
   return (
@@ -380,14 +487,6 @@ export default function SettingsPage() {
         </div>
         <div>
           {content[tab]}
-          {tab !== "profile" && (
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8 }}>
-              <button style={{ padding: "9px 20px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--text-secondary)", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-              <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 22px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                <Save size={14} /> Save Changes
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

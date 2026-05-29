@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { X, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSpaces, getOccupiedSpaces } from "@/lib/useSpaces";
+import { useSettings } from "@/lib/useSettings";
 
 interface Props { onClose: () => void; onSaved: () => void; }
 
@@ -26,6 +27,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function AddMemberModal({ onClose, onSaved }: Props) {
+  const { symbol } = useSettings();
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [occupied, setOccupied]   = useState<string[]>([]);
@@ -196,10 +198,10 @@ export default function AddMemberModal({ onClose, onSaved }: Props) {
             {/* Financials */}
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 14 }}>Financials</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
-              <Field label="Security Deposit (₹)">
+              <Field label={`Security Deposit (${symbol})`}>
                 <input value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} type="number" placeholder="8000" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
               </Field>
-              <Field label="Monthly Rent (₹)">
+              <Field label={`Monthly Rent (${symbol})`}>
                 <input value={form.rent_amount} onChange={e => set("rent_amount", e.target.value)} type="number" placeholder="4500" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
               </Field>
               <Field label="Prints Allowed">

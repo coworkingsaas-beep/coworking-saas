@@ -10,6 +10,7 @@ import type { Member } from "@/lib/supabase";
 import AddMemberModal from "@/components/members/AddMemberModal";
 import EditMemberModal from "@/components/members/EditMemberModal";
 import { useSpaces, getOccupiedSpaces } from "@/lib/useSpaces";
+import { useSettings } from "@/lib/useSettings";
 
 // ── Mock data from roadmap fields ──────────────────────────────────────────
 const MEMBERS = [
@@ -275,6 +276,7 @@ export default function MembersPage() {
   const [editMember, setEditMember]      = useState<Member | null>(null);
 
   const { spaces } = useSpaces();
+  const { fmt } = useSettings();
 
   // Build occupiedBy map: space_code → member_id
   useEffect(() => {
@@ -308,8 +310,8 @@ export default function MembersPage() {
     phone: m.phone, email: m.email ?? "", dob: m.date_of_birth ?? "—",
     joiningDate: m.joining_date, renewalDate: m.renewal_date ?? "—",
     spaceType: m.space_type ?? "—", assignedSpace: m.assigned_space ?? "—",
-    securityDeposit: `₹${m.security_deposit.toLocaleString()}`,
-    rentAmount: `₹${m.rent_amount.toLocaleString()}`,
+    securityDeposit: fmt(m.security_deposit),
+    rentAmount: fmt(m.rent_amount),
     paymentStatus: "N/A", teamSize: `${m.team_size}`,
     printsUsed: m.total_prints_used, printsAllowed: m.total_prints_allowed,
     status: m.status, discounted: m.discounted_member,

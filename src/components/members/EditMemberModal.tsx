@@ -4,6 +4,7 @@ import { X, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSpaces, getOccupiedSpaces } from "@/lib/useSpaces";
 import type { Member } from "@/lib/supabase";
+import { useSettings } from "@/lib/useSettings";
 
 interface Props { member: Member; onClose: () => void; onSaved: () => void; }
 
@@ -28,6 +29,7 @@ const focus = (e: React.FocusEvent<any>) => (e.currentTarget.style.borderColor =
 const blur  = (e: React.FocusEvent<any>) => (e.currentTarget.style.borderColor = "var(--border)");
 
 export default function EditMemberModal({ member, onClose, onSaved }: Props) {
+  const { symbol } = useSettings();
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [occupied, setOccupied] = useState<string[]>([]);
@@ -181,8 +183,8 @@ export default function EditMemberModal({ member, onClose, onSaved }: Props) {
 
             <SectionLabel label="Financials & Prints"/>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:14, marginBottom:20 }}>
-              <Field label="Security Deposit (₹)"><input value={form.security_deposit} onChange={e=>set("security_deposit",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
-              <Field label="Monthly Rent (₹)"><input value={form.rent_amount} onChange={e=>set("rent_amount",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
+              <Field label={`Security Deposit (${symbol})`}><input value={form.security_deposit} onChange={e=>set("security_deposit",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
+              <Field label={`Monthly Rent (${symbol})`}><input value={form.rent_amount} onChange={e=>set("rent_amount",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
               <Field label="Prints Used"><input value={form.total_prints_used} onChange={e=>set("total_prints_used",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
               <Field label="Prints Allowed"><input value={form.total_prints_allowed} onChange={e=>set("total_prints_allowed",e.target.value)} type="number" style={inp} onFocus={focus} onBlur={blur}/></Field>
             </div>

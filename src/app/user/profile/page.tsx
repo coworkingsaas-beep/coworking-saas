@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Member } from "@/lib/supabase";
 import { Save, Loader2 } from "lucide-react";
+import { useSettings } from "@/lib/useSettings";
 
 const inp: React.CSSProperties = { width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13.5, fontFamily: "inherit", background: "var(--neutral)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" };
 const foc = (e: React.FocusEvent<any>) => (e.currentTarget.style.borderColor = "var(--primary)");
@@ -12,6 +13,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function UserProfilePage() {
+  const { fmt } = useSettings();
   const [member,  setMember]  = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
@@ -71,8 +73,8 @@ export default function UserProfilePage() {
           {[
             { label: "Member Since", value: member?.joining_date ? new Date(member.joining_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
             { label: "Renewal Date",  value: member?.renewal_date ? new Date(member.renewal_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
-            { label: "Monthly Rent",  value: member?.rent_amount ? `₹${member.rent_amount.toLocaleString()}` : "—" },
-            { label: "Security Dep.", value: member?.security_deposit ? `₹${member.security_deposit.toLocaleString()}` : "—" },
+            { label: "Monthly Rent",  value: member?.rent_amount ? fmt(member.rent_amount) : "—" },
+            { label: "Security Dep.", value: member?.security_deposit ? fmt(member.security_deposit) : "—" },
           ].map(({ label, value }) => (
             <div key={label} style={{ padding: "10px 14px", background: "var(--neutral)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
               <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>

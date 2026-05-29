@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { X, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useSettings } from "@/lib/useSettings";
 
 interface Member { id: string; name: string; rent_amount: number; assigned_space: string | null; }
 interface Props { onClose: () => void; onSaved: () => void; prefillMemberId?: string; }
@@ -21,6 +22,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function RecordPaymentModal({ onClose, onSaved, prefillMemberId }: Props) {
+  const { symbol } = useSettings();
   const [members, setMembers] = useState<Member[]>([]);
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function RecordPaymentModal({ onClose, onSaved, prefillMemberId }
                 {members.map(m=><option key={m.id} value={m.id}>{m.name}{m.assigned_space?` (${m.assigned_space})`:""}</option>)}
               </select>
             </Field>
-            <Field label="Amount (₹)">
+            <Field label={`Amount (${symbol})`}>
               <input value={form.amount} onChange={e=>set("amount",e.target.value)} type="number" min="0" style={inp} onFocus={f} onBlur={b}/>
             </Field>
             <Field label="Payment Mode">

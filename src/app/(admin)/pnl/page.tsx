@@ -5,6 +5,7 @@ import {
   TrendingUp, TrendingDown, IndianRupee, BarChart3,
   Plus, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
+import { useSettings } from "@/lib/useSettings";
 
 // ── Roadmap 3.6 ──────────────────────────────────────────────────────────────
 type EntryType = "Income" | "Expense";
@@ -63,12 +64,12 @@ function CategoryBadge({ cat }: { cat: Category }) {
   return <span style={{ fontSize: 11.5, fontWeight: 700, background: c.bg, color: c.color, padding: "3px 10px", borderRadius: 999 }}>{cat}</span>;
 }
 
-function Amount({ val, type }: { val: number; type: EntryType }) {
+function Amount({ val, type, fmt }: { val: number; type: EntryType; fmt: (n: number) => string }) {
   const isIncome = type === "Income";
   return (
     <span style={{ fontWeight: 700, fontSize: 13.5, color: isIncome ? "#10B981" : "#EF4444", display: "flex", alignItems: "center", gap: 3 }}>
       {isIncome ? <ArrowUpRight size={14} strokeWidth={2.5} /> : <ArrowDownRight size={14} strokeWidth={2.5} />}
-      ₹{val.toLocaleString()}
+      {fmt(val)}
     </span>
   );
 }
@@ -94,7 +95,7 @@ function KpiCard({ icon: Icon, iconColor, iconBg, label, value, trend, trendPosi
   );
 }
 
-function MonthCard({ s }: { s: MonthSummary }) {
+function MonthCard({ s, fmt }: { s: MonthSummary; fmt: (n: number) => string }) {
   const positive = s.profit >= 0;
   return (
     <div style={{ background: "var(--surface)", borderRadius: "var(--radius-sm)", border: `1px solid ${positive ? "var(--border)" : "#FEE2E220"}`, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
@@ -112,7 +113,7 @@ function MonthCard({ s }: { s: MonthSummary }) {
           <div key={label}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
               <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{label}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color }}>₹{val.toLocaleString()}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color }}>{fmt(val)}</span>
             </div>
             <div style={{ height: 3, background: "var(--border)", borderRadius: 999, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${Math.min((val / Math.max(s.income, s.expense)) * 100, 100)}%`, background: color, borderRadius: 999 }} />
@@ -122,7 +123,7 @@ function MonthCard({ s }: { s: MonthSummary }) {
       </div>
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 12.5, fontWeight: 800, color: positive ? "#10B981" : "#EF4444" }}>
-          {positive ? "+" : ""}₹{s.profit.toLocaleString()}
+          {positive ? "+" : ""}{fmt(s.profit)}
         </span>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Margin: <strong style={{ color: positive ? "#10B981" : "#EF4444" }}>{s.margin}%</strong></span>
       </div>
@@ -138,6 +139,7 @@ const th = (label: string, extra?: React.CSSProperties) => (
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PnLPage() {
+  const { fmt } = useSettings();
   const [typeFilter, setTypeFilter] = useState("All");
   const [catFilter,  setCatFilter]  = useState("All");
   const [monthFilter, setMonthFilter] = useState("All");
@@ -170,15 +172,15 @@ export default function PnLPage() {
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
-        <KpiCard icon={IndianRupee}  iconColor="#10B981" iconBg="#D1FAE5" label="Total Income"   value={`₹${(totalIncome/1000).toFixed(1)}k`}  trend={8}   trendPositive={true} />
-        <KpiCard icon={TrendingDown} iconColor="#EF4444" iconBg="#FEE2E2" label="Total Expenses" value={`₹${(totalExpense/1000).toFixed(1)}k`} trend={3}   trendPositive={false} />
-        <KpiCard icon={TrendingUp}   iconColor={netProfit >= 0 ? "#10B981" : "#EF4444"} iconBg={netProfit >= 0 ? "#D1FAE5" : "#FEE2E2"} label="Net Profit" value={`${netProfit >= 0 ? "+" : ""}₹${(netProfit/1000).toFixed(1)}k`} />
+        <KpiCard icon={IndianRupee}  iconColor="#10B981" iconBg="#D1FAE5" label="Total Income"   value={fmt(totalIncome)}  trend={8}   trendPositive={true} />
+        <KpiCard icon={TrendingDown} iconColor="#EF4444" iconBg="#FEE2E2" label="Total Expenses" value={fmt(totalExpense)} trend={3}   trendPositive={false} />
+        <KpiCard icon={TrendingUp}   iconColor={netProfit >= 0 ? "#10B981" : "#EF4444"} iconBg={netProfit >= 0 ? "#D1FAE5" : "#FEE2E2"} label="Net Profit" value={`${netProfit >= 0 ? "+" : ""}${fmt(netProfit)}`} />
         <KpiCard icon={BarChart3}    iconColor="#6366F1" iconBg="#EDE9FE" label="Profit Margin"  value={`${margin}%`} />
       </div>
 
       {/* Month summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginBottom: 24 }}>
-        {summaries.map(s => <MonthCard key={`${s.month}-${s.year}`} s={s} />)}
+        {summaries.map(s => <MonthCard key={`${s.month}-${s.year}`} s={s} fmt={fmt} />)}
       </div>
 
       {/* Table */}
@@ -233,7 +235,7 @@ export default function PnLPage() {
                       </span>
                     </td>
                     <td style={{ padding: "12px 14px", background: bg, borderBottom: "1px solid var(--border-light)", whiteSpace: "nowrap" }}><CategoryBadge cat={e.category} /></td>
-                    <td style={{ padding: "12px 14px", background: bg, borderBottom: "1px solid var(--border-light)", whiteSpace: "nowrap" }}><Amount val={e.amount} type={e.type} /></td>
+                    <td style={{ padding: "12px 14px", background: bg, borderBottom: "1px solid var(--border-light)", whiteSpace: "nowrap" }}><Amount val={e.amount} type={e.type} fmt={fmt} /></td>
                     <td style={{ padding: "12px 14px", fontSize: 12.5, color: "var(--text-secondary)", background: bg, borderBottom: "1px solid var(--border-light)", whiteSpace: "nowrap" }}>{e.month} {e.year}</td>
                     <td style={{ padding: "12px 14px", background: bg, borderBottom: "1px solid var(--border-light)", whiteSpace: "nowrap" }}>
                       {e.linkedPayment
@@ -256,10 +258,10 @@ export default function PnLPage() {
           <div style={{ display: "flex", gap: 20 }}>
             <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Showing <strong style={{ color: "var(--text-primary)" }}>{filtered.length}</strong> of <strong style={{ color: "var(--text-primary)" }}>{ENTRIES.length}</strong> entries</span>
             <span style={{ fontSize: 13, color: "#10B981", fontWeight: 700 }}>
-              ↑ ₹{filtered.filter(e => e.type === "Income").reduce((s, e) => s + e.amount, 0).toLocaleString()}
+              ↑ {fmt(filtered.filter(e => e.type === "Income").reduce((s, e) => s + e.amount, 0))}
             </span>
             <span style={{ fontSize: 13, color: "#EF4444", fontWeight: 700 }}>
-              ↓ ₹{filtered.filter(e => e.type === "Expense").reduce((s, e) => s + e.amount, 0).toLocaleString()}
+              ↓ {fmt(filtered.filter(e => e.type === "Expense").reduce((s, e) => s + e.amount, 0))}
             </span>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -282,8 +284,8 @@ export default function PnLPage() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{cat}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 700, background: c.bg, color: c.color, padding: "2px 8px", borderRadius: 999 }}>Category</span>
               </div>
-              {income  > 0 && <div style={{ fontSize: 12.5, color: "#10B981", fontWeight: 700, marginBottom: 3 }}>↑ ₹{income.toLocaleString()}</div>}
-              {expense > 0 && <div style={{ fontSize: 12.5, color: "#EF4444", fontWeight: 700 }}>↓ ₹{expense.toLocaleString()}</div>}
+              {income  > 0 && <div style={{ fontSize: 12.5, color: "#10B981", fontWeight: 700, marginBottom: 3 }}>↑ {fmt(income)}</div>}
+              {expense > 0 && <div style={{ fontSize: 12.5, color: "#EF4444", fontWeight: 700 }}>↓ {fmt(expense)}</div>}
             </div>
           );
         })}

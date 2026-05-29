@@ -3,10 +3,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Member } from "@/lib/supabase";
 import { CreditCard, Loader2, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { useSettings } from "@/lib/useSettings";
 
 interface Payment { id: string; amount: number; mode: string; payment_date: string; month: string; year: number; status: string; notes: string | null; }
 
 export default function UserPaymentsPage() {
+  const { fmt } = useSettings();
   const [member,   setMember]   = useState<Member | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -43,8 +45,8 @@ export default function UserPaymentsPage() {
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
         {[
-          { icon: CreditCard,   bg: "#EDE9FE", color: "#6366F1", label: "Monthly Rent",  value: member?.rent_amount ? `₹${member.rent_amount.toLocaleString()}` : "—" },
-          { icon: CheckCircle,  bg: "#D1FAE5", color: "#059669", label: "Total Paid",     value: `₹${totalPaid.toLocaleString()}` },
+          { icon: CreditCard,   bg: "#EDE9FE", color: "#6366F1", label: "Monthly Rent",  value: member?.rent_amount ? fmt(member.rent_amount) : "—" },
+          { icon: CheckCircle,  bg: "#D1FAE5", color: "#059669", label: "Total Paid",     value: fmt(totalPaid) },
           { icon: daysLeft !== null && daysLeft <= 7 ? AlertCircle : Clock,
             bg: daysLeft !== null && daysLeft <= 7 ? "#FEE2E2" : "#FEF3C7",
             color: daysLeft !== null && daysLeft <= 7 ? "#EF4444" : "#D97706",
@@ -77,7 +79,7 @@ export default function UserPaymentsPage() {
             <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)" }}>Security Deposit Paid</div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>One-time refundable deposit</div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#059669" }}>₹{member.security_deposit.toLocaleString()}</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#059669" }}>{fmt(member.security_deposit)}</div>
         </div>
       ) : null}
 
@@ -96,7 +98,7 @@ export default function UserPaymentsPage() {
                     onMouseEnter={e => (e.currentTarget as HTMLElement).querySelectorAll("td").forEach(c => (c as HTMLElement).style.background = "var(--neutral)")}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).querySelectorAll("td").forEach(c => (c as HTMLElement).style.background = "var(--surface)")}>
                     <td style={tdS}><span style={{ fontWeight: 600 }}>{p.month} {p.year}</span></td>
-                    <td style={tdS}><strong style={{ color: "#059669" }}>₹{p.amount.toLocaleString()}</strong></td>
+                    <td style={tdS}><strong style={{ color: "#059669" }}>{fmt(p.amount)}</strong></td>
                     <td style={tdS}><span style={{ fontSize: 12, fontWeight: 700, color: "#6366F1", background: "#EDE9FE", padding: "2px 8px", borderRadius: 6 }}>{p.mode}</span></td>
                     <td style={tdS}>{new Date(p.payment_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                     <td style={tdS}><span style={{ fontSize: 11.5, fontWeight: 700, background: "#D1FAE5", color: "#065F46", padding: "3px 10px", borderRadius: 999 }}>{p.status}</span></td>

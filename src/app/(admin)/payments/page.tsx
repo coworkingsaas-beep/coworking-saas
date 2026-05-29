@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { CreditCard, AlertTriangle, CheckCircle, Clock, Search, Plus, ChevronLeft, ChevronRight, Loader2, IndianRupee, RefreshCw, Banknote } from "lucide-react";
+import { CreditCard, AlertTriangle, CheckCircle, Clock, Search, Plus, ChevronLeft, ChevronRight, Loader2, DollarSign, RefreshCw, Banknote } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Member } from "@/lib/supabase";
 import RecordPaymentModal from "@/components/payments/RecordPaymentModal";
+import { useSettings } from "@/lib/useSettings";
 
 type PaymentMode = "Cash"|"UPI"|"Bank";
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -90,6 +91,7 @@ function KpiCard({icon:Icon,iconColor,iconBg,label,value,badge,badgeColor}:any) 
 const W_NUM=52, W_NAME=200;
 
 export default function PaymentsPage() {
+  const { fmt } = useSettings();
   const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [monthFilter,  setMonthFilter]  = useState("All");
@@ -148,7 +150,7 @@ export default function PaymentsPage() {
 
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:28}}>
-        <KpiCard icon={IndianRupee} iconColor="#10B981" iconBg="#D1FAE5" label="Revenue Collected" value={`₹${(totalRev/1000).toFixed(1)}k`}/>
+        <KpiCard icon={DollarSign} iconColor="#10B981" iconBg="#D1FAE5" label="Revenue Collected" value={fmt(totalRev)}/>
         <KpiCard icon={AlertTriangle} iconColor="#EF4444" iconBg="#FEE2E2" label="Overdue" value={overdueRows.length} badge="Urgent" badgeColor="#EF4444"/>
         <KpiCard icon={Clock} iconColor="#F59E0B" iconBg="#FEF3C7" label="Pending" value={pendingCount}/>
         <KpiCard icon={CheckCircle} iconColor="#6366F1" iconBg="#EDE9FE" label="Paid This Month" value={rows.filter(r=>r.paid).length}/>
@@ -186,7 +188,7 @@ export default function PaymentsPage() {
                         </div>
                       </td>
                       <td style={{padding:"12px 16px",fontSize:13,color:"var(--text-secondary)",background:bg}}>{memberData?.assigned_space||"—"}</td>
-                      <td style={{padding:"12px 16px",fontWeight:700,fontSize:13.5,background:bg}}>₹{r.rentAmount.toLocaleString()}</td>
+                      <td style={{padding:"12px 16px",fontWeight:700,fontSize:13.5,background:bg}}>{fmt(r.rentAmount)}</td>
                       <td style={{padding:"12px 16px",fontSize:13,background:bg}}>{r.dueDate}</td>
                       <td style={{padding:"12px 16px",background:bg}}><StatusBadge paid={r.paid} overdue={r.isOverdue}/></td>
                       <td style={{padding:"12px 16px",background:bg}}>
@@ -271,7 +273,7 @@ export default function PaymentsPage() {
                     </td>
                     <td style={tdB}><span style={{fontFamily:"monospace",fontSize:12.5,color:"var(--text-secondary)"}}>{p.id}</span></td>
                     <td style={tdB}>{p.month} {p.year}</td>
-                    <td style={tdB}><strong>₹{p.rentAmount.toLocaleString()}</strong></td>
+                    <td style={tdB}><strong>{fmt(p.rentAmount)}</strong></td>
                     <td style={tdB}><span style={{fontWeight:700,color:p.paid?"#059669":"var(--text-muted)",fontSize:12}}>{p.paid?"✓":"✗"}</span></td>
                     <td style={tdB}>{p.paymentDate??"—"}</td>
                     <td style={tdB}><ModeBadge mode={p.mode}/></td>
@@ -308,7 +310,7 @@ export default function PaymentsPage() {
                 <div style={{width:40,height:40,borderRadius:10,background:c.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><c.icon size={19} color={c.color} strokeWidth={1.8}/></div>
                 <span style={{fontSize:15,fontWeight:700,color:"var(--text-primary)"}}>{mode}</span>
               </div>
-              <div style={{fontSize:22,fontWeight:800,color:"var(--text-primary)",marginBottom:4}}>₹0</div>
+              <div style={{fontSize:22,fontWeight:800,color:"var(--text-primary)",marginBottom:4}}>{fmt(0)}</div>
               <div style={{fontSize:12.5,color:"var(--text-muted)"}}>0 payments recorded</div>
             </div>
           );
